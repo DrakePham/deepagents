@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import shutil
+import tempfile
 import tomllib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -1198,23 +1199,15 @@ def create_cli_agent(
             )
 
     user_agents_dir = settings.get_user_agents_dir(assistant_id)
-    user_subagents_dir = user_agents_dir.parent / "subagents"
     project_agents_dir = (
         project_context.project_agents_dir()
         if project_context is not None
         else settings.get_project_agents_dir()
     )
-    project_subagents_dir = (
-        project_agents_dir.parent / "subagents"
-        if project_agents_dir is not None
-        else None
-    )
 
     for subagent_meta in list_subagents(
         user_agents_dir=user_agents_dir,
-        user_subagents_dir=user_subagents_dir,
         project_agents_dir=project_agents_dir,
-        project_subagents_dir=project_subagents_dir,
     ):
         subagent: SubAgent = {
             "name": subagent_meta["name"],
@@ -1420,10 +1413,32 @@ def create_cli_agent(
         # Full HITL for destructive operations
         interrupt_on = _add_interrupt_on()  # type: ignore[assignment]  # InterruptOnConfig is compatible at runtime
 
-    # Keep exactly one execution/filesystem surface. Tool artifacts and
-    # conversation offloads live on the selected backend instead of routing to
-    # host-local temp backends.
-    composite_backend = CompositeBackend(default=backend, routes={})
+    # Set up composite backend with routing
+    # For local FilesystemBackend, route large tool results to /tmp to avoid polluting
+    # the working directory. For sandbox backends, no special routing is needed.
+    if sandbox is None:
+        # Local mode: Route large results to a unique temp directory
+        large_results_backend = FilesystemBackend(
+            root_dir=tempfile.mkdtemp(prefix="deepagents_large_results_"),
+            virtual_mode=True,
+        )
+        conversation_history_backend = FilesystemBackend(
+            root_dir=tempfile.mkdtemp(prefix="deepagents_conversation_history_"),
+            virtual_mode=True,
+        )
+        composite_backend = CompositeBackend(
+            default=backend,
+            routes={
+                "/large_tool_results/": large_results_backend,
+                "/conversation_history/": conversation_history_backend,
+            },
+        )
+    else:
+        # Sandbox mode: No special routing needed
+        composite_backend = CompositeBackend(
+            default=backend,
+            routes={},
+        )
 
     from deepagents.middleware.summarization import create_summarization_tool_middleware
 
