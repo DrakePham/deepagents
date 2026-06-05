@@ -2,6 +2,13 @@
 
 # Deep Agents Changelog
 
+## [0.6.9](https://github.com/langchain-ai/deepagents/compare/deepagents==0.6.8...deepagents==0.6.9) (2026-06-05)
+
+
+### Bug Fixes
+
+* **sdk:** keep private state out of subagent propagation ([#3542](https://github.com/langchain-ai/deepagents/issues/3542)) ([7ff9553](https://github.com/langchain-ai/deepagents/commit/7ff9553fc057a682ba503ebfe9a870adb51ab848))
+
 ## [0.6.8](https://github.com/langchain-ai/deepagents/compare/deepagents==0.6.7...deepagents==0.6.8) (2026-06-03)
 
 ### Features
